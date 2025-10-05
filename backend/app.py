@@ -217,4 +217,4 @@ def extract_preview():
 
 if __name__ == "__main__":
     # In a production environment, set debug=False
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=False, host="0.0.0.0", port=5000)
