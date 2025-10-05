@@ -24,14 +24,16 @@ android {
         applicationId = "com.example.invoice_matcher"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+         minSdk = 24          // must be 24+ for runtime permissions
+        targetSdk = 33       // latest recommended
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
+            isShrinkResources = false
+            isMinifyEnabled = false
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")

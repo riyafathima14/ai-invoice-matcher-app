@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; 
+import 'dart:io' show Platform; // Explicitly showing import for Platform
 import 'package:file_picker/file_picker.dart';
-import 'package:invoice_matcher/api_services/api_service.dart'; // Import structures
+import 'package:invoice_matcher/api_services/api_service.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 typedef FilePickCallback = void Function(String docType, PlatformFile file);
 
@@ -22,14 +25,93 @@ class FileUploaderCard extends StatelessWidget {
     required this.onPickFile,
   });
 
+  Future<bool> _checkAndRequestPermission(BuildContext context) async {
+    // 1. Skip check if running on the web or desktop/fuchsia
+    if (kIsWeb) {
+      return true;
+    }
+    
+    // Check for non-Android/iOS platforms (Windows, Linux, macOS)
+    if (!kIsWeb) {
+      try {
+        if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+          return true;
+        }
+      } catch (e) {
+        // Fallback if dart:io Platform is not available in some environments
+        // This usually means we are on a mobile platform if it's not kIsWeb
+        print('Platform check failed, assuming mobile environment.');
+      }
+    }
+
+
+    // 2. Mobile Platform Logic (Android/iOS)
+    try {
+      // Use Permission.storage, which is the most common permission used by file_picker.
+      // On Android 13 (SDK 33), this implicitly translates to Media/Files access
+      // depending on the file type being accessed via the system picker.
+      PermissionStatus status = await Permission.storage.request();
+      
+      if (status.isGranted) {
+        return true;
+      }
+      
+      if (status.isPermanentlyDenied) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+                'Permission to access files is permanently denied. Please enable it in Settings.'),
+            action: SnackBarAction(
+              label: 'Open Settings',
+              onPressed: () => openAppSettings(),
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        return false;
+      }
+      
+      return status.isGranted;
+      
+    } catch (e) {
+      print('Permission check error: $e. Proceeding without explicit permission check.');
+      return true; 
+    }
+  }
+
   Future<void> _handleFilePick(BuildContext context) async {
+    // 1. Check/Request Runtime Permission (Mobile only)
+    if (!await _checkAndRequestPermission(context)) {
+      return; // Stop if permission was denied
+    }
+
+    // 2. Proceed with file picking
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      // CRITICAL: Set withData to true to try and get bytes immediately (good for web/debug)
+      withData: true, 
     );
 
-    if (result != null && result.files.single.bytes != null) {
-      onPickFile(docType, result.files.single);
+    // 3. Robust validation check
+    if (result != null && result.files.isNotEmpty) {
+      final file = result.files.single;
+
+      // Check if file bytes (web/in-memory) OR file path (mobile temporary) is available.
+      if (file.bytes != null || file.path != null) { 
+        onPickFile(docType, file);
+        return;
+      }
+    }
+    
+    // If we reach here, picking failed silently, show a message on mobile.
+    if (!kIsWeb) {
+       ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('File selection failed. Please try a different file or location.'),
+            duration: Duration(seconds: 3),
+          ),
+        );
     }
   }
 
