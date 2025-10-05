@@ -1,0 +1,15 @@
+{
+  "builds": [
+    {
+      "src": "index.html",
+      "use": "@vercel/static-build",
+      "config": {
+        "installCommand": "npm install -g flutter-cli",
+        "buildCommand": "flutter build web --release"
+      }
+    }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/build/web/$1" }
+  ]
+}
