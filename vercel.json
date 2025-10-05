@@ -10,6 +10,13 @@
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "/build/web/$1" }
+    {
+      "src": "/[^.]+",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/.*",
+      "dest": "/index.html"
+    }
   ]
 }
