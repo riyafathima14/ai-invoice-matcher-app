@@ -11,30 +11,26 @@ import fitz  # PyMuPDF
 import pytesseract
 from constants import DOCUMENT_SCHEMA 
 
-# --- Tesseract Configuration (Uncomment and set path if needed on Windows) ---
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# --- Item Comparison Helper ---
 
 def find_best_item_match(invoice_item, po_items):
     """
     Tries to find the best matching PO item for a given Invoice item by normalizing descriptions.
     A simple approach is used here: normalize and check for key phrase inclusion.
     """
-    # Normalize the description from the Invoice item we are checking
+    
     inv_desc_normalized = normalize_text(invoice_item.get('description', ''))
     
     for po_item in po_items:
-        # Normalize the description from the current PO item
+       
         po_desc_normalized = normalize_text(po_item.get('description', ''))
         
-        # Simple containment check: if one description is contained within the other
+        
         if inv_desc_normalized in po_desc_normalized or po_desc_normalized in inv_desc_normalized:
             return po_item
             
     return None
 
-# --- Document Processing and Extraction (Remains the same) ---
+
 def normalize_text(text):
     """Normalize text for comparison (lowercase, remove punctuation/extra whitespace)."""
     text = text.lower()

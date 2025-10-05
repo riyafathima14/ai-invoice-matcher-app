@@ -8,20 +8,19 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 from google import genai
 
-# FIX: Import modular functionality using the direct module name (non-relative import)
-# This works because __init__.py is present in the backend directory.
+
 from utils import extract_text_from_file, gemini_extract_data, perform_matching
 
-# --- Configuration and Initialization ---
+
 
 app = Flask(__name__)
 CORS(app)
 
-# Load environment variables (GEMINI_API_KEY)
+
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
 
-# Global job manager and AI client instances
+
 job_manager = {}
 client = None
 
@@ -36,7 +35,7 @@ else:
         print(f"Error initializing Gemini client: {e}")
         client = None
 
-# --- Main Job Runner (Async Thread) ---
+
 
 def run_matching_job(job_id, invoice_file_data, po_file_data, invoice_filename, po_filename):
     """The actual long-running task to be executed in a separate thread."""
@@ -44,7 +43,6 @@ def run_matching_job(job_id, invoice_file_data, po_file_data, invoice_filename, 
     job_manager[job_id]["progress"] = 5
     
     try:
-        # 1. Extract Raw Text (Progress: 5% -> 25%) - Uses Advanced OCR Fallback
         time.sleep(0.5)
         raw_invoice_text = extract_text_from_file(invoice_file_data, invoice_filename)
         job_manager[job_id]["progress"] = 15
@@ -54,9 +52,7 @@ def run_matching_job(job_id, invoice_file_data, po_file_data, invoice_filename, 
         if raw_invoice_text.startswith("Error") or raw_po_text.startswith("Error"):
             raise Exception(f"File Extraction Error: {raw_invoice_text} | {raw_po_text}")
 
-        # 2. AI Structured Extraction - Invoice (Progress: 25% -> 50%)
         if not client:
-            # Fallback to Mock Data if client is not initialized
             time.sleep(2)
             invoice_data = {
                 "document_type": "Invoice",
@@ -67,14 +63,11 @@ def run_matching_job(job_id, invoice_file_data, po_file_data, invoice_filename, 
             }
             job_manager[job_id]["progress"] = 50
         else:
-            # Note: client is passed to the utility function
             invoice_data = gemini_extract_data(client, raw_invoice_text, "Invoice")
             job_manager[job_id]["progress"] = 50
             if "error" in invoice_data: raise Exception(f"AI Extraction Error (Invoice): {invoice_data['error']}")
         
-        # 3. AI Structured Extraction - PO (Progress: 50% -> 75%)
         if not client:
-            # Fallback to Mock Data if client is not initialized
             po_data = {
                 "document_type": "Purchase Order",
                 "document_id": "PO-2024-001",
@@ -84,29 +77,24 @@ def run_matching_job(job_id, invoice_file_data, po_file_data, invoice_filename, 
             }
             job_manager[job_id]["progress"] = 75
         else:
-            # Note: client is passed to the utility function
             po_data = gemini_extract_data(client, raw_po_text, "Purchase Order")
             job_manager[job_id]["progress"] = 75
             if "error" in po_data: raise Exception(f"AI Extraction Error (PO): {po_data['error']}")
 
-        # 4. Perform Matching and Finalize Results (Progress: 75% -> 100%) - Uses Line-Item Check
         final_results = perform_matching(invoice_data, po_data)
         
-        # Final status update
         job_manager[job_id]["results"] = final_results
         job_manager[job_id]["progress"] = 100
         job_manager[job_id]["status"] = "completed"
         print(f"Job {job_id}: Completed successfully. Match: {final_results['isMatch']}")
 
     except Exception as e:
-        # Graceful failure update
         if job_id in job_manager:
             job_manager[job_id]["error"] = str(e)
             job_manager[job_id]["status"] = "failed"
             job_manager[job_id]["progress"] = 100
         print(f"Job {job_id}: Failed with error: {e}")
 
-# --- API ENDPOINTS ---
 
 @app.route("/submit_job", methods=["POST"])
 def submit_job():
@@ -128,7 +116,6 @@ def submit_job():
     except Exception as e:
         return jsonify({"error": f"Error reading files: {e}"}), 500
 
-    # Start the asynchronous job
     job_id = str(uuid.uuid4())
     job_manager[job_id] = {"status": "processing", "progress": 0, "results": None, "error": None}
     
@@ -156,7 +143,6 @@ def get_status(job_id):
     
     if job["status"] == "completed":
         results = job["results"]
-        # Note: extracted data fields (invoice_data, po_data) are included in results
         return jsonify({
             "status": "completed",
             "progress": 100,
@@ -194,18 +180,15 @@ def extract_preview():
         file_data = file.read()
         filename = file.filename
         
-        # 1. Raw text extraction
         raw_text = extract_text_from_file(file_data, filename)
         if raw_text.startswith("Error"):
              return jsonify({"error": f"Extraction failed: {raw_text}"}), 500
 
-        # 2. AI Structured Extraction (Note: client is passed)
         extracted_data = gemini_extract_data(client, raw_text, "Document")
         
         if "error" in extracted_data: 
              return jsonify({"error": f"AI Parsing failed: {extracted_data['error']}"}), 500
 
-        # Return only the essential fields for preview
         return jsonify({
             "document_id": extracted_data.get('document_id', 'N/A'),
             "vendor_name": extracted_data.get('vendor_name', 'N/A'),
@@ -216,5 +199,4 @@ def extract_preview():
 
 
 if __name__ == "__main__":
-    # In a production environment, set debug=False
     app.run(debug=False, host="0.0.0.0", port=5000)
