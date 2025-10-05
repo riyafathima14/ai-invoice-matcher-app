@@ -1,17 +1,13 @@
 {
   "builds": [
     {
-      "src": "**/*.dart",
-      "use": "@vercel/static-build",
-      "config": {
-        "installCommand": "npm install -g flutter-cli",
-        "buildCommand": "flutter build web --release"
-      }
+      "src": "build/web/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/.*",
+      "src": "/(.*)",
       "dest": "/index.html"
     }
   ]
